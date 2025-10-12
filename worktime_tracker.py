@@ -7,7 +7,7 @@ from tkinter import ttk
 import json
 import sys, os
 import datetime
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 
 SAVE_FILE = "worktime_data.json"
 WORK_SECONDS_PER_DAY = 4 * 3600
@@ -82,7 +82,8 @@ class WorkTimeTracker:
         self.running = True
         self.elapsed_running_time = int(0)
         self.start_running_time = time.time()
-        if self.last_day_date != datetime.date.today().isoformat():
+        self.update_score_time()
+        if self.last_day_date != date.today().isoformat():
             self.on_new_date()
         self.button.config(text="Pause")
 
@@ -93,11 +94,11 @@ class WorkTimeTracker:
         # Update total time
         self.total_time += self.last_day_time
         self.total_time_label.config(text=self.format_time(self.total_time))
-        # Clear day time
+        # Clear last day time
         self.last_day_time = 0
         self.work_time_value_label.config(text=self.format_time(self.last_day_time))
-        # Update lat date
-        self.last_day_date = datetime.date.today().isoformat()
+        # Update last date
+        self.last_day_date = date.today().isoformat()
         self.last_day_date_label.config(text=self.last_day_date)
         # Save new data
         self.save_data()
@@ -127,13 +128,21 @@ class WorkTimeTracker:
             self.score_time_label.config(foreground="red")
 
     def update_workdays(self):
-        current = datetime.datetime.strptime(self.start_date, "%Y-%m-%d").date()
-        end_date = date.today()
-        self.workdays = 0
-        while current <= end_date:
-            if current.weekday() < 5:
-                self.workdays += 1
-            current += timedelta(days=1)
+        cur_date = datetime.strptime(self.start_date, "%Y-%m-%d").date()
+        end_date = datetime.strptime(self.last_day_date, "%Y-%m-%d").date()
+        if end_date > cur_date:
+            total_days = (end_date - cur_date) // timedelta(days=1)
+            total_weeks = total_days // 7
+            # work days = weeks * 5
+            self.workdays = total_weeks * 5
+            # move cur_date to weeks ahead
+            cur_date += total_weeks * 7 * timedelta(days=1)
+            while cur_date <= end_date:
+                if cur_date.weekday() < 5:
+                    self.workdays += 1
+                cur_date += timedelta(days=1)
+        else:
+            self.workdays = 0
 
     def save_data(self):
         data = {"last_day_date": self.last_day_date,
@@ -150,17 +159,17 @@ class WorkTimeTracker:
                 self.last_day_date = data.get("last_day_date", 0)
                 self.last_day_time = int(data.get("last_day_time", 0))
                 self.total_time = int(data.get("total_time", 0))
-                self.start_date = data.get("start_date", datetime.date.today().isoformat())
+                self.start_date = data.get("start_date", date.today().isoformat())
         else:
             self.last_day_date = 0
             self.last_day_time = int(0)
             self.total_time = int(0)
-            self.start_date = datetime.date.today().isoformat()
+            self.start_date = date.today().isoformat()
 
     # ---------------- Time tick ----------------
     def update_timer(self):
         while True:
-            if self.last_day_date != datetime.date.today().isoformat():
+            if self.last_day_date != date.today().isoformat():
                 self.on_new_date()
             if self.running:
                 self.elapsed_running_time = int(time.time() - self.start_running_time)
