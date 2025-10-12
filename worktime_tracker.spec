@@ -5,7 +5,7 @@ a = Analysis(
     ['worktime_tracker.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('clock.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,4 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['clock.ico'],
 )
