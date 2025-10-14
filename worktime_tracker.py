@@ -124,13 +124,15 @@ class WorkTimeTracker:
         self.score_time_label.config(text=self.format_time(score_time))
         if score_time >= 0:
             self.score_time_label.config(foreground="green")
-        else:
+        elif score_time < -WORK_SECONDS_PER_DAY:
             self.score_time_label.config(foreground="red")
+        else:
+            self.score_time_label.config(foreground="orange")
 
     def update_workdays(self):
         cur_date = datetime.strptime(self.start_date, "%Y-%m-%d").date()
         end_date = datetime.strptime(self.last_day_date, "%Y-%m-%d").date()
-        if end_date > cur_date:
+        if end_date >= cur_date:
             total_days = (end_date - cur_date) // timedelta(days=1)
             total_weeks = total_days // 7
             # work days = weeks * 5
@@ -156,12 +158,12 @@ class WorkTimeTracker:
         if os.path.exists(SAVE_FILE):
             with open(SAVE_FILE, "r") as f:
                 data = json.load(f)
-                self.last_day_date = data.get("last_day_date", 0)
+                self.last_day_date = data.get("last_day_date", date.today().isoformat())
                 self.last_day_time = int(data.get("last_day_time", 0))
                 self.total_time = int(data.get("total_time", 0))
                 self.start_date = data.get("start_date", date.today().isoformat())
         else:
-            self.last_day_date = 0
+            self.last_day_date = date.today().isoformat()
             self.last_day_time = int(0)
             self.total_time = int(0)
             self.start_date = date.today().isoformat()
