@@ -15,8 +15,8 @@ WORK_SECONDS_PER_DAY = 4 * 3600
 class WorkTimeTracker:
     def __init__(self, root):
         self.root = root
-        self.root.title("Work Time Tracker")
-        self.root.geometry("320x300")
+        self.root.title("Time Tracker")
+        self.root.geometry("240x300")
         self.root.resizable(False, False)
         
         if getattr(sys, 'frozen', False):
@@ -38,9 +38,6 @@ class WorkTimeTracker:
         # Timer tick handler
         threading.Thread(target=self.update_timer, daemon=True).start()
 
-        # WMI Sleep/Resume handler
-        threading.Thread(target=self.watch_sleep_resume, daemon=True).start()
-
     def create_ui(self):
         self.work_time_label = ttk.Label(self.root, text="Work Time:", font=("Segoe UI", 14))
         self.work_time_label.pack(pady=5)
@@ -56,10 +53,10 @@ class WorkTimeTracker:
         self.score_time_label = ttk.Label(self.root, text=self.format_time(0), font=("Segoe UI", 12, "bold"))
         self.score_time_label.pack()
 
-        self.total_label = ttk.Label(self.root, text="Total Time:", font=("Segoe UI", 10))
-        self.total_label.pack()
-        self.total_time_label = ttk.Label(self.root, text=self.format_time(self.total_time), font=("Segoe UI", 10, "bold"))
+        self.total_time_label = ttk.Label(self.root, text="Total Time:", font=("Segoe UI", 12))
         self.total_time_label.pack()
+        self.total_time_value_label = ttk.Label(self.root, text=self.format_time(self.total_time), font=("Segoe UI", 12, "bold"))
+        self.total_time_value_label.pack()
 
         self.date_label = ttk.Label(self.root, text="Work Date:", font=("Segoe UI", 10))
         self.date_label.pack()
@@ -74,7 +71,9 @@ class WorkTimeTracker:
 
     def pause(self):
         self.running = False
+        # Update time elapsed for the last day
         self.last_day_time += self.elapsed_running_time
+        self.elapsed_running_time = int(0)
         self.save_data()
         self.button.config(text="Resume")
 
@@ -82,21 +81,19 @@ class WorkTimeTracker:
         self.running = True
         self.elapsed_running_time = int(0)
         self.start_running_time = time.time()
-        self.update_score_time()
+        self.update_time_ui()
         if self.last_day_date != date.today().isoformat():
             self.on_new_date()
         self.button.config(text="Pause")
 
     def on_new_date(self):
+        # Update time elapsed for the last day
         self.last_day_time += self.elapsed_running_time
         self.elapsed_running_time = int(0)
         self.start_running_time = time.time()
-        # Update total time
+        # Update total time with the time for the last day
         self.total_time += self.last_day_time
-        self.total_time_label.config(text=self.format_time(self.total_time))
-        # Clear last day time
         self.last_day_time = 0
-        self.work_time_value_label.config(text=self.format_time(self.last_day_time))
         # Update last date
         self.last_day_date = date.today().isoformat()
         self.last_day_date_label.config(text=self.last_day_date)
@@ -104,7 +101,7 @@ class WorkTimeTracker:
         self.save_data()
         # Updated workdays and score time
         self.update_workdays()
-        self.update_score_time()
+        self.update_time_ui()
 
     def on_close(self):
         if self.running:
@@ -119,8 +116,12 @@ class WorkTimeTracker:
         s = int(seconds % 60)
         return f"{sign}{h:02}:{m:02}:{s:02}"
         
-    def update_score_time(self):
-        score_time = self.total_time + self.last_day_time + self.elapsed_running_time - self.workdays * WORK_SECONDS_PER_DAY
+    def update_time_ui(self):
+        work_time = self.last_day_time + self.elapsed_running_time
+        self.work_time_value_label.config(text=self.format_time(work_time))
+        total_time = self.total_time + work_time
+        self.total_time_value_label.config(text=self.format_time(total_time))
+        score_time = total_time - self.workdays * WORK_SECONDS_PER_DAY
         self.score_time_label.config(text=self.format_time(score_time))
         if score_time >= 0:
             self.score_time_label.config(foreground="green")
@@ -175,29 +176,8 @@ class WorkTimeTracker:
                 self.on_new_date()
             if self.running:
                 self.elapsed_running_time = int(time.time() - self.start_running_time)
-                work_time = self.last_day_time + self.elapsed_running_time
-                self.work_time_value_label.config(text=self.format_time(work_time))
-                self.update_score_time()
+                self.update_time_ui()
             time.sleep(1)
-
-    # ---------------- WMI Sleep/Resume ----------------
-    def watch_sleep_resume(self):
-        c = wmi.WMI()
-        watcher = c.Win32_PowerManagementEvent.watch_for()
-
-        while True:
-            pythoncom.PumpWaitingMessages()
-            event = watcher()
-
-            # Event codes:
-            # 4 = entering sleep
-            # 7 = resume from sleep
-            if event.EventType == 4:
-                if self.running:
-                    self.pause()
-            elif event.EventType == 7:
-                if not self.running:
-                    self.resume()
 
 if __name__ == "__main__":
     root = tk.Tk()
