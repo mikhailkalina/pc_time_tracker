@@ -1,3 +1,4 @@
 build/
 dist/
 worktime_data.json
+__pycache__/

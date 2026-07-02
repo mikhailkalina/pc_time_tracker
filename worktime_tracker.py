@@ -1,16 +1,13 @@
-import pythoncom
-import wmi
 import threading
 import time
 import tkinter as tk
 from tkinter import ttk
 import json
 import sys, os
-import datetime
 from datetime import datetime, date, timedelta
 
 SAVE_FILE = "worktime_data.json"
-WORK_SECONDS_PER_DAY = 4 * 3600
+WORK_SECONDS_PER_DAY = 6 * 3600
 
 class WorkTimeTracker:
     def __init__(self, root):
@@ -87,6 +84,11 @@ class WorkTimeTracker:
         self.button.config(text="Pause")
 
     def on_new_date(self):
+        today = date.today()
+        previous_date = datetime.strptime(self.last_day_date, "%Y-%m-%d").date()
+        current_month_start = today.replace(day=1)
+        month_changed = (previous_date.year, previous_date.month) != (today.year, today.month)
+
         # Update time elapsed for the last day
         self.last_day_time += self.elapsed_running_time
         self.elapsed_running_time = int(0)
@@ -94,8 +96,14 @@ class WorkTimeTracker:
         # Update total time with the time for the last day
         self.total_time += self.last_day_time
         self.last_day_time = 0
+        if month_changed:
+            balance_start = datetime.strptime(self.start_date, "%Y-%m-%d").date()
+            balance_end = current_month_start - timedelta(days=1)
+            required_seconds = self.count_workdays(balance_start, balance_end) * WORK_SECONDS_PER_DAY
+            self.total_time -= required_seconds
+            self.start_date = current_month_start.isoformat()
         # Update last date
-        self.last_day_date = date.today().isoformat()
+        self.last_day_date = today.isoformat()
         self.last_day_date_label.config(text=self.last_day_date)
         # Save new data
         self.save_data()
@@ -130,22 +138,24 @@ class WorkTimeTracker:
         else:
             self.score_time_label.config(foreground="orange")
 
+    def count_workdays(self, cur_date, end_date):
+        if end_date < cur_date:
+            return 0
+
+        total_days = (end_date - cur_date) // timedelta(days=1)
+        total_weeks = total_days // 7
+        workdays = total_weeks * 5
+        cur_date += total_weeks * 7 * timedelta(days=1)
+        while cur_date <= end_date:
+            if cur_date.weekday() < 5:
+                workdays += 1
+            cur_date += timedelta(days=1)
+        return workdays
+
     def update_workdays(self):
         cur_date = datetime.strptime(self.start_date, "%Y-%m-%d").date()
         end_date = datetime.strptime(self.last_day_date, "%Y-%m-%d").date()
-        if end_date >= cur_date:
-            total_days = (end_date - cur_date) // timedelta(days=1)
-            total_weeks = total_days // 7
-            # work days = weeks * 5
-            self.workdays = total_weeks * 5
-            # move cur_date to weeks ahead
-            cur_date += total_weeks * 7 * timedelta(days=1)
-            while cur_date <= end_date:
-                if cur_date.weekday() < 5:
-                    self.workdays += 1
-                cur_date += timedelta(days=1)
-        else:
-            self.workdays = 0
+        self.workdays = self.count_workdays(cur_date, end_date)
 
     def save_data(self):
         data = {"last_day_date": self.last_day_date,
